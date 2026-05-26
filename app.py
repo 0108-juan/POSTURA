@@ -2,15 +2,13 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import influxdb_client
+import time
 
-# 1. Configuración de la página
 st.set_page_config(page_title="Posture Tracker App", page_icon="🩺", layout="centered")
 
-# Inicializar el estado de la app (para saber si ya entró o está en el menú)
 if 'started' not in st.session_state:
     st.session_state['started'] = False
 
-# CSS para simular App de Teléfono en tonos Azul Baby y Botón Cute
 st.markdown("""
 <style>
     .stApp { background-color: #f2f7fb; }
@@ -28,7 +26,6 @@ st.markdown("""
     
     h1, h2, h3 { color: #5c8cb3; text-align: center; }
     
-    /* Estilo para el botón de Comenzar */
     .stButton>button {
         width: 100%;
         border-radius: 20px;
@@ -44,7 +41,6 @@ st.markdown("""
         color: white;
     }
     
-    /* Tarjetas médicas cute */
     div[data-testid="stMetric"] {
         background-color: #f0f6fc;
         border-radius: 20px;
@@ -54,14 +50,11 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- LÓGICA DE PANTALLAS ---
-
 if not st.session_state['started']:
-    # PANTALLA DE INICIO (MENU)
     st.markdown("<br><br>", unsafe_allow_html=True)
     st.markdown("<h1 style='font-size: 40px;'>🩺</h1>", unsafe_allow_html=True)
     st.markdown("<h1>Posture Tracker</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #9bbcd8;'>Cuida tu espalda de forma inteligente.</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #9bbcd8;'>Cuida tu espalda de forma inteligente y aesthetic.</p>", unsafe_allow_html=True)
     st.markdown("<br><br>", unsafe_allow_html=True)
     
     if st.button("Comenzar"):
@@ -69,53 +62,72 @@ if not st.session_state['started']:
         st.rerun()
 
 else:
-    # PANTALLA DE DATOS (DASHBOARD)
+    # --- MECANISMO DE TIEMPO REAL (AUTO-REFRESH) ---
+    # Esto fuerza a la app a volver a ejecutarse y pedir datos nuevos cada 2 segundos
+    st.fragment(run_every=2)
     
-    # 2. Conexión y Datos (Respaldo silencioso incluido)
     url = "https://us-east-1-1.aws.cloud2.influxdata.com/"
     token = "hFiRK2sGAD4uMuyGl1cXxApTtrPuoIlbrc8ERykxqQJB56gyzCEpcWiGL4tXjQGkit6lHeTPaJSDyVPPn6R-7Q=="
     org = "Jojo"
     bucket = "postura_ergonomia"
 
     try:
-        client = influxdb_client.InfluxDBClient(url=url, token=token, org=org, timeout=5000)
+        client = influxdb_client.InfluxDBClient(url=url, token=token, org=org, timeout=3000)
         query_api = client.query_api()
+        
+        # Consultamos únicamente las últimas lecturas para agilizar la carga en tiempo real
         query = f'''
         from(bucket: "{bucket}")
-          |> range(start: -24h)
+          |> range(start: -1h)
           |> filter(fn: (r) => r["_measurement"] == "Postura")
           |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
         '''
         df = query_api.query_data_frame(query)
-        if df.empty or 'distancia' not in df.columns: raise ValueError()
-        df['distancia'] = pd.to_numeric(df['distancia'], errors='coerce').dropna()
+        
+        if df.empty or 'distancia' not in df.columns: 
+            raise ValueError()
+            
+        df['distancia'] = pd.to_numeric(df['distancia'], errors='coerce')
+        df = df.dropna(subset=['distancia'])
+        
+        if 'alerta' in df.columns:
+            df['alerta'] = pd.to_numeric(df['alerta'], errors='coerce').fillna(0).astype(int)
+            
+        es_datos_reales = True
     except Exception:
+        # Si la base de datos no responde, genera una fluctuación linda para la presentación
+        es_datos_reales = False
+        registros = 20
+        base_dist = np.random.randint(42, 48)
         df = pd.DataFrame({
-            'distancia': np.random.randint(35, 55, size=20),
-            'alerta': np.random.choice([0, 1], size=20, p=[0.8, 0.2])
+            'distancia': [base_dist + np.random.randint(-3, 4) for _ in range(registros)],
+            'alerta': np.random.choice([0, 1], size=registros, p=[0.9, 0.1])
         })
 
-    # 3. Diseño del Dashboard
     st.markdown("<h2 style='font-size: 22px;'>🩺 PostureCare</h2>", unsafe_allow_html=True)
     
-    # Banner dinámico
     ultima_distancia = int(df['distancia'].iloc[-1])
+    
+    # Banner de alerta dinámico basado en la última lectura recibida
     if ultima_distancia < 40:
         st.markdown("<div style='background-color: #fff0f0; padding: 12px; border-radius: 15px; text-align: center; border: 2px solid #ffd6d6; color: #c97d7d; font-size: 13px;'>⚠️ <b>¡Cuidado!</b> Recupera tu postura.</div>", unsafe_allow_html=True)
     else:
         st.markdown("<div style='background-color: #f0fcf4; padding: 12px; border-radius: 15px; text-align: center; border: 2px solid #d6f7e1; color: #6db384; font-size: 13px;'>✨ <b>Todo bien.</b> Estás derecho.</div>", unsafe_allow_html=True)
 
-    # Métricas
     st.markdown("<br>", unsafe_allow_html=True)
     c1, c2 = st.columns(2)
-    c1.metric("Distancia", f"{int(df['distancia'].mean())} cm")
-    c2.metric("Sesión", "Activa ✅")
+    
+    # Muestra la distancia actual en tiempo real en la tarjeta principal
+    c1.metric("Distancia Actual", f"{ultima_distancia} cm")
+    
+    if es_datos_reales:
+        c2.metric("Conexión", "En Vivo 📡")
+    else:
+        c2.metric("Conexión", "Simulado 🔄")
 
-    # Gráfica
     st.markdown("<h3 style='font-size: 16px; text-align: left; margin-top: 20px;'>📊 Historial Reciente</h3>", unsafe_allow_html=True)
     st.line_chart(df['distancia'].tail(15), color="#7da0bf")
 
-    # NUEVA TARJETA DE DIAGNÓSTICO CLÍNICO
     st.markdown(f"""
     <div style='background-color: #ffffff; padding: 15px; border-radius: 20px; border: 2px solid #e1eef7; margin-top: 15px;'>
         <p style='color: #5c8cb3; font-size: 12px; margin: 0; text-align: justify;'>
@@ -124,7 +136,6 @@ else:
     </div>
     """, unsafe_allow_html=True)
 
-    # Botón para volver al menú
     if st.button("Cerrar Sesión"):
         st.session_state['started'] = False
         st.rerun()
