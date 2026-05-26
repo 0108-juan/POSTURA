@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import influxdb_client
-import time
+from streamlit_autorefresh import st_autorefresh
 
 st.set_page_config(page_title="Posture Tracker App", page_icon="🩺", layout="centered")
 
@@ -62,9 +62,8 @@ if not st.session_state['started']:
         st.rerun()
 
 else:
-    # --- MECANISMO DE TIEMPO REAL (AUTO-REFRESH) ---
-    # Esto fuerza a la app a volver a ejecutarse y pedir datos nuevos cada 2 segundos
-    st.fragment(run_every=2)
+    # Fuerza un refresco de toda la app cada 2000 milisegundos (2 segundos)
+    st_autorefresh(interval=2000, key="datarefresh")
     
     url = "https://us-east-1-1.aws.cloud2.influxdata.com/"
     token = "hFiRK2sGAD4uMuyGl1cXxApTtrPuoIlbrc8ERykxqQJB56gyzCEpcWiGL4tXjQGkit6lHeTPaJSDyVPPn6R-7Q=="
@@ -75,7 +74,6 @@ else:
         client = influxdb_client.InfluxDBClient(url=url, token=token, org=org, timeout=3000)
         query_api = client.query_api()
         
-        # Consultamos únicamente las últimas lecturas para agilizar la carga en tiempo real
         query = f'''
         from(bucket: "{bucket}")
           |> range(start: -1h)
@@ -95,12 +93,12 @@ else:
             
         es_datos_reales = True
     except Exception:
-        # Si la base de datos no responde, genera una fluctuación linda para la presentación
         es_datos_reales = False
         registros = 20
+        # Simula una fluctuación leve en tiempo real si el servidor de Influx está vacío
         base_dist = np.random.randint(42, 48)
         df = pd.DataFrame({
-            'distancia': [base_dist + np.random.randint(-3, 4) for _ in range(registros)],
+            'distancia': [base_dist + np.random.randint(-2, 3) for _ in range(registros)],
             'alerta': np.random.choice([0, 1], size=registros, p=[0.9, 0.1])
         })
 
@@ -108,7 +106,6 @@ else:
     
     ultima_distancia = int(df['distancia'].iloc[-1])
     
-    # Banner de alerta dinámico basado en la última lectura recibida
     if ultima_distancia < 40:
         st.markdown("<div style='background-color: #fff0f0; padding: 12px; border-radius: 15px; text-align: center; border: 2px solid #ffd6d6; color: #c97d7d; font-size: 13px;'>⚠️ <b>¡Cuidado!</b> Recupera tu postura.</div>", unsafe_allow_html=True)
     else:
@@ -117,7 +114,6 @@ else:
     st.markdown("<br>", unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     
-    # Muestra la distancia actual en tiempo real en la tarjeta principal
     c1.metric("Distancia Actual", f"{ultima_distancia} cm")
     
     if es_datos_reales:
