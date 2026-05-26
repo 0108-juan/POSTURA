@@ -61,7 +61,7 @@ if not st.session_state['started']:
     st.markdown("<br><br>", unsafe_allow_html=True)
     st.markdown("<h1 style='font-size: 40px;'>🩺</h1>", unsafe_allow_html=True)
     st.markdown("<h1>Posture Tracker</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #9bbcd8;'>Cuida tu espalda de forma inteligente y aesthetic.</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #9bbcd8;'>Cuida tu espalda de forma inteligente.</p>", unsafe_allow_html=True)
     st.markdown("<br><br>", unsafe_allow_html=True)
     
     if st.button("Comenzar"):
