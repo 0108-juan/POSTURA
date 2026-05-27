@@ -87,13 +87,8 @@ else:
 
         query=f'''
         from(bucket: "{bucket}")
-          |> range(start: -24h)
-          |> filter(fn: (r) => r["_measurement"] == "Postura")
-          |> pivot(
-              rowKey:["_time"],
-              columnKey:["_field"],
-              valueColumn:"_value"
-          )
+          |> range(start: -30d)
+
         '''
 
         df=query_api.query_data_frame(query)
