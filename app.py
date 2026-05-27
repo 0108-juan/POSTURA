@@ -70,7 +70,7 @@ else:
     )
 
     url="https://us-east-1-1.aws.cloud2.influxdata.com/"
-    token="TU_TOKEN"
+    token="hFiRK2sGAD4uMuyGl1cXxApTtrPuoIlbrc8ERykxqQJB56gyzCEpcWiGL4tXjQGkit6lHeTPaJSDyVPPn6R-7Q=="
     org="Jojo"
     bucket="postura_ergonomia"
 
